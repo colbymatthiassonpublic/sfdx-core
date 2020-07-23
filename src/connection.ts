@@ -8,13 +8,16 @@
 import { maxBy, merge } from '@salesforce/kit';
 import { asString, ensure, isString, JsonCollection, JsonMap, Optional } from '@salesforce/ts-types';
 import { Tooling as JSForceTooling } from 'jsforce';
-import { ExecuteOptions } from 'jsforce';
-import { QueryResult } from 'jsforce';
-import { RequestInfo } from 'jsforce';
-import { ConnectionOptions } from 'jsforce';
-import { Connection as JSForceConnection } from 'jsforce';
-import { Promise as JsforcePromise } from 'jsforce';
+import {
+  Connection as JSForceConnection,
+  ConnectionOptions,
+  ExecuteOptions,
+  Promise as JsforcePromise,
+  QueryResult,
+  RequestInfo
+} from 'jsforce';
 import { AuthFields, AuthInfo } from './authInfo';
+import { Config } from './config/config';
 import { ConfigAggregator } from './config/configAggregator';
 import { Logger } from './logger';
 import { SfdxError } from './sfdxError';
@@ -258,8 +261,13 @@ export class Connection extends JSForceConnection {
    * @param options The query options. NOTE: the autoFetch option will always be true.
    */
   public async autoFetchQuery<T>(soql: string, options: ExecuteOptions = {}): Promise<QueryResult<T>> {
+    const config: Config = await Config.create(Config.getDefaultOptions());
+    // take the limit from the calling function, then the config, then default 10,000
+    const limit: number = options.maxFetch || (config.get('maxQueryLimit') as number) || 10000;
+
     const _options: ExecuteOptions = Object.assign(options, {
-      autoFetch: true
+      autoFetch: true,
+      maxFetch: limit
     });
     const records: T[] = [];
 
@@ -269,13 +277,18 @@ export class Connection extends JSForceConnection {
       this.query<T>(soql, _options)
         .on('record', rec => records.push(rec))
         .on('error', err => reject(err))
-        .on('end', () =>
+        .on('end', () => {
+          if (records.length >= 10000 || limit < 10000) {
+            this._logger.warn(
+              'The query result is missing records due to an API limit. Increase the number of records returned by setting the config value "maxQueryLimit" to greater than 10,000 (the default value).'
+            );
+          }
           resolve({
             done: true,
             totalSize: records.length,
             records
-          })
-        )
+          });
+        })
     );
   }
 }

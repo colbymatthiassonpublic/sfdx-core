@@ -102,6 +102,11 @@ export class Config extends ConfigFile<ConfigFile.Options> {
   public static readonly DISABLE_TELEMETRY = 'disableTelemetry';
 
   /**
+   * allows users to override the 10,000 result query limit
+   */
+  public static readonly MAX_QUERY_LIMIT = 'maxQueryLimit';
+
+  /**
    * Returns the default file name for a config file.
    *
    * **See** {@link SFDX_CONFIG_FILE_NAME}
@@ -278,7 +283,8 @@ export class Config extends ConfigFile<ConfigFile.Options> {
             validator: value => value != null && ['true', 'false'].includes(value.toString()),
             failedMessage: Config.messages.getMessage('InvalidBooleanConfigValue')
           }
-        }
+        },
+        { key: Config.MAX_QUERY_LIMIT }
       ];
     }
 
